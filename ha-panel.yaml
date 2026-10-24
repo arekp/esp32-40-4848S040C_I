@@ -4,6 +4,9 @@ substitutions:
   salon_player: media_player.onkyo_2
   sypialnia_player: media_player.sypialnia
   weather_entity: weather.forecast_dom
+  # --- zakres docelowy temperatury terrarium [C] (status na zegarze i wskaznik) ---
+  terrarium_temp_min: "22.0"
+  terrarium_temp_max: "32.0"
 
 esphome:
   name: ${device_name}
@@ -56,6 +59,11 @@ wifi:
     password: !secret ap_fallback_password
 
 captive_portal:
+
+globals:
+  - id: screensaver_on
+    type: bool
+    initial_value: "true"
 
 # ---------- CZAS ----------
 time:
@@ -134,9 +142,10 @@ sensor:
       - lvgl.label.update:
           id: salon_power_label
           text: !lambda 'return str_sprintf("%.0f W", x);'
-      - lvgl.bar.update:
+      - lvgl.arc.update:
           id: salon_power_bar
-          value: !lambda 'return (int)(x * 0.5f);'
+          value: !lambda 'return (int)x;'
+      - script.execute: update_summary
 
   - platform: homeassistant
     id: ha_energy_salon
@@ -158,9 +167,10 @@ sensor:
       - lvgl.label.update:
           id: sypialnia_power_label
           text: !lambda 'return str_sprintf("%.0f W", x);'
-      - lvgl.bar.update:
+      - lvgl.arc.update:
           id: sypialnia_power_bar
-          value: !lambda 'return (int)(x * 0.5f);'
+          value: !lambda 'return (int)x;'
+      - script.execute: update_summary
 
   - platform: homeassistant
     id: ha_energy_sypialnia
@@ -182,9 +192,10 @@ sensor:
       - lvgl.label.update:
           id: kuchnia_power_label
           text: !lambda 'return str_sprintf("%.0f W", x);'
-      - lvgl.bar.update:
+      - lvgl.arc.update:
           id: kuchnia_power_bar
-          value: !lambda 'return (int)(x * 0.5f);'
+          value: !lambda 'return (int)x;'
+      - script.execute: update_summary
 
   - platform: homeassistant
     id: ha_energy_kuchnia
@@ -209,6 +220,7 @@ sensor:
       - lvgl.bar.update:
           id: terrarium_power_bar
           value: !lambda 'return (int)(x * 0.5f);'
+      - script.execute: update_summary
 
   - platform: homeassistant
     id: ha_temp_terrarium
@@ -218,6 +230,11 @@ sensor:
       - lvgl.label.update:
           id: terrarium_temp_label
           text: !lambda 'return str_sprintf("%.1f C", x);'
+      - lvgl.label.update:
+          id: terr_bubble_label
+          text: !lambda 'return str_sprintf("%.1f C", x);'
+      - script.execute: update_terrarium
+      - script.execute: update_summary
 
   - platform: homeassistant
     id: ha_hum_terrarium
@@ -227,6 +244,7 @@ sensor:
       - lvgl.label.update:
           id: terrarium_hum_label
           text: !lambda 'return str_sprintf("%.0f %%", x);'
+      - script.execute: update_terrarium
 
 
   - platform: homeassistant
@@ -259,7 +277,27 @@ sensor:
     on_value:
       - lvgl.label.update:
           id: weather_temp
-          text: !lambda 'return str_sprintf("%.0f C", x);'
+          text: !lambda 'return str_sprintf("%.1f C", x);'
+
+  - platform: homeassistant
+    id: ha_weather_wind
+    entity_id: ${weather_entity}
+    attribute: wind_speed
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: wind_label
+          text: !lambda 'return str_sprintf("%.0f km/h", x);'
+
+  - platform: homeassistant
+    id: ha_weather_humidity
+    entity_id: ${weather_entity}
+    attribute: humidity
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: hum_out_label
+          text: !lambda 'return str_sprintf("%.0f %%", x);'
 
 # ---------- STANY PRZELACZNIKOW HA ----------
 text_sensor:
@@ -273,18 +311,21 @@ text_sensor:
     entity_id: switch.gnizdo_rybki_salon
     internal: true
     on_value:
+      - script.execute: update_summary
       - if:
           condition:
             lambda: 'return x == "on";'
           then:
             - lvgl.widget.update: {id: salon_toggle, state: {checked: true}}
             - lvgl.label.update: {id: salon_toggle_label, text: "ON"}
-            - lvgl.widget.show: salon_ring
+            - lvgl.widget.update: {id: sc_salon, bg_color: 0x4FC3F7}
+            - lvgl.widget.update: {id: sc_salon_icon, text_color: 0x0A1030}
             - lvgl.widget.update: {id: salon_card, border_color: 0x4FC3F7, border_width: 2}
           else:
             - lvgl.widget.update: {id: salon_toggle, state: {checked: false}}
             - lvgl.label.update: {id: salon_toggle_label, text: "OFF"}
-            - lvgl.widget.hide: salon_ring
+            - lvgl.widget.update: {id: sc_salon, bg_color: 0x1A2A63}
+            - lvgl.widget.update: {id: sc_salon_icon, text_color: 0x8E9BC8}
             - lvgl.widget.update: {id: salon_card, border_color: 0x2C3858, border_width: 1}
 
   - platform: homeassistant
@@ -292,18 +333,21 @@ text_sensor:
     entity_id: switch.gniazdo16w
     internal: true
     on_value:
+      - script.execute: update_summary
       - if:
           condition:
             lambda: 'return x == "on";'
           then:
             - lvgl.widget.update: {id: sypialnia_toggle, state: {checked: true}}
             - lvgl.label.update: {id: sypialnia_toggle_label, text: "ON"}
-            - lvgl.widget.show: sypialnia_ring
+            - lvgl.widget.update: {id: sc_sypialnia, bg_color: 0xB388FF}
+            - lvgl.widget.update: {id: sc_sypialnia_icon, text_color: 0x0A1030}
             - lvgl.widget.update: {id: sypialnia_card, border_color: 0xB388FF, border_width: 2}
           else:
             - lvgl.widget.update: {id: sypialnia_toggle, state: {checked: false}}
             - lvgl.label.update: {id: sypialnia_toggle_label, text: "OFF"}
-            - lvgl.widget.hide: sypialnia_ring
+            - lvgl.widget.update: {id: sc_sypialnia, bg_color: 0x1A2A63}
+            - lvgl.widget.update: {id: sc_sypialnia_icon, text_color: 0x8E9BC8}
             - lvgl.widget.update: {id: sypialnia_card, border_color: 0x2C3858, border_width: 1}
 
   - platform: homeassistant
@@ -311,18 +355,21 @@ text_sensor:
     entity_id: switch.gniazdo20w
     internal: true
     on_value:
+      - script.execute: update_summary
       - if:
           condition:
             lambda: 'return x == "on";'
           then:
             - lvgl.widget.update: {id: kuchnia_toggle, state: {checked: true}}
             - lvgl.label.update: {id: kuchnia_toggle_label, text: "ON"}
-            - lvgl.widget.show: kuchnia_ring
+            - lvgl.widget.update: {id: sc_kuchnia, bg_color: 0xFFB74D}
+            - lvgl.widget.update: {id: sc_kuchnia_icon, text_color: 0x0A1030}
             - lvgl.widget.update: {id: kuchnia_card, border_color: 0xFFB74D, border_width: 2}
           else:
             - lvgl.widget.update: {id: kuchnia_toggle, state: {checked: false}}
             - lvgl.label.update: {id: kuchnia_toggle_label, text: "OFF"}
-            - lvgl.widget.hide: kuchnia_ring
+            - lvgl.widget.update: {id: sc_kuchnia, bg_color: 0x1A2A63}
+            - lvgl.widget.update: {id: sc_kuchnia_icon, text_color: 0x8E9BC8}
             - lvgl.widget.update: {id: kuchnia_card, border_color: 0x2C3858, border_width: 1}
 
   - platform: homeassistant
@@ -330,6 +377,7 @@ text_sensor:
     entity_id: switch.gniazdo6_20w
     internal: true
     on_value:
+      - script.execute: update_summary
       - if:
           condition:
             lambda: 'return x == "on";'
@@ -337,11 +385,15 @@ text_sensor:
             - lvgl.widget.update: {id: terrarium_toggle, state: {checked: true}}
             - lvgl.label.update: {id: terrarium_toggle_label, text: "ON"}
             - lvgl.widget.show: terrarium_ring
+            - lvgl.widget.update: {id: sc_terrarium, bg_color: 0x66BB6A}
+            - lvgl.widget.update: {id: sc_terrarium_icon, text_color: 0x0A1030}
             - lvgl.widget.update: {id: terrarium_card, border_color: 0x66BB6A, border_width: 2}
           else:
             - lvgl.widget.update: {id: terrarium_toggle, state: {checked: false}}
             - lvgl.label.update: {id: terrarium_toggle_label, text: "OFF"}
             - lvgl.widget.hide: terrarium_ring
+            - lvgl.widget.update: {id: sc_terrarium, bg_color: 0x1A2A63}
+            - lvgl.widget.update: {id: sc_terrarium_icon, text_color: 0x8E9BC8}
             - lvgl.widget.update: {id: terrarium_card, border_color: 0x2C3858, border_width: 1}
 
 
@@ -510,20 +562,6 @@ text_sensor:
             if (x == "lightning" || x == "lightning-rainy") return "\U000F0593";
             if (x == "windy" || x == "windy-variant") return "\U000F059D";
             return "\U000F0590";
-      - lvgl.label.update:
-          id: weather_text
-          text: !lambda |-
-            if (x == "sunny") return "Slonecznie";
-            if (x == "clear-night") return "Pogodna noc";
-            if (x == "partlycloudy") return "Zachmurzenie";
-            if (x == "cloudy") return "Pochmurno";
-            if (x == "rainy") return "Deszcz";
-            if (x == "pouring") return "Ulewa";
-            if (x == "snowy" || x == "snowy-rainy") return "Snieg";
-            if (x == "fog") return "Mgla";
-            if (x == "lightning" || x == "lightning-rainy") return "Burza";
-            if (x == "windy" || x == "windy-variant") return "Wietrznie";
-            return x;
 
 # ---------- CZCIONKI ----------
 font:
@@ -536,21 +574,27 @@ font:
     id: mdi_small
     size: 22
     bpp: 4
-    glyphs: ["\U000F023A", "\U000F050F", "\U000F058E", "\U000F0335", "\U000F0493", "\U000F02DC", "\U000F078D"]
+    glyphs: ["\U000F023A", "\U000F050F", "\U000F058E", "\U000F0335", "\U000F0493", "\U000F02DC", "\U000F078D", "\U000F04C3", "\U000F05E0", "\U000F0026"]
   - file: "https://raw.githubusercontent.com/Templarian/MaterialDesign-Webfont/v7.4.47/fonts/materialdesignicons-webfont.ttf"
     id: mdi_ctl
     size: 28
     bpp: 4
     glyphs: ["\U000F040A", "\U000F03E4", "\U000F04AD", "\U000F04AE", "\U000F075D", "\U000F075E"]
   - file: "https://raw.githubusercontent.com/Templarian/MaterialDesign-Webfont/v7.4.47/fonts/materialdesignicons-webfont.ttf"
-    id: mdi_weather
-    size: 48
+    id: mdi_wx
+    size: 30
     bpp: 4
-    glyphs: ["\U000F0599", "\U000F0594", "\U000F0595", "\U000F0590", "\U000F0597", "\U000F0596", "\U000F0598", "\U000F0591", "\U000F0593", "\U000F059D"]
-  - file: "gfonts://Roboto@500"
-    id: font_clock
-    size: 72
+    glyphs: ["\U000F0599", "\U000F0594", "\U000F0595", "\U000F0590", "\U000F0597", "\U000F0596", "\U000F0598", "\U000F0591", "\U000F0593", "\U000F059D", "\U000F058E", "\U000F050F"]
+  - file: "gfonts://Roboto@700"
+    id: font_huge
+    size: 140
     bpp: 4
+    glyphs: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ":"]
+  - file: "gfonts://Roboto@300"
+    id: font_dim
+    size: 110
+    bpp: 4
+    glyphs: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ":"]
   - file: "gfonts://Roboto@300"
     id: font_big
     size: 46
@@ -623,14 +667,78 @@ script:
             - lvgl.label.update:
                 id: clock_label
                 text: !lambda 'return id(ha_time).now().strftime("%H:%M");'
+            - lvgl.label.update:
+                id: dim_clock_label
+                text: !lambda 'return id(ha_time).now().strftime("%H:%M");'
+            - lambda: |-
+                static const char *dn[] = {"Niedziela", "Poniedzialek", "Wtorek", "Sroda", "Czwartek", "Piatek", "Sobota"};
+                static const char *mn[] = {"stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca", "sierpnia", "wrzesnia", "pazdziernika", "listopada", "grudnia"};
+                auto t = id(ha_time).now();
+                std::string d = str_sprintf("%s, %d %s", dn[t.day_of_week - 1], t.day_of_month, mn[t.month - 1]);
+                lv_label_set_text(id(date_label), d.c_str());
+                lv_label_set_text(id(dim_info_label), d.c_str());
+                // wygaszacz: co minute przesuwa zegar, zeby IPS sie nie wypalal
+                lv_obj_align(id(dim_box), LV_ALIGN_CENTER, ((t.minute * 37) % 81) - 40, ((t.minute * 23) % 101) - 50);
+
+  # Podsumowanie na zegarze i kafelku "Razem": moc, liczba wlaczonych gniazdek, status
+  - id: update_summary
+    then:
+      - lambda: |-
+          float p[4] = {id(ha_power_salon).state, id(ha_power_sypialnia).state,
+                        id(ha_power_kuchnia).state, id(ha_power_terrarium).state};
+          std::string s[4] = {id(ha_salon_state).state, id(ha_sypialnia_state).state,
+                              id(ha_kuchnia_state).state, id(ha_terrarium_state).state};
+          float total = 0;
+          int on = 0;
+          for (int i = 0; i < 4; i++) {
+            if (!std::isnan(p[i])) total += p[i];
+            if (s[i] == "on") on++;
+          }
+          std::string pw = str_sprintf("Razem %.0f W", total);
+          std::string sk = str_sprintf("Gniazdka %d/4", on);
+          lv_label_set_text(id(pill_power_label), pw.c_str());
+          lv_label_set_text(id(pill_sockets_label), sk.c_str());
+          std::string tw = str_sprintf("%.0f W", total);
+          std::string tc = str_sprintf("%d/4 wlaczone", on);
+          lv_label_set_text(id(total_power_label), tw.c_str());
+          lv_label_set_text(id(total_count_label), tc.c_str());
+
+          float t = id(ha_temp_terrarium).state;
+          bool bad = !std::isnan(t) && (t < ${terrarium_temp_min} || t > ${terrarium_temp_max});
+          std::string st = bad ? "Terrarium: temperatura poza zakresem" : "Wszystko w normie";
+          uint32_t col = bad ? 0xEF5350 : 0x2ECC8F;
+          lv_label_set_text(id(status_label), st.c_str());
+          lv_label_set_text(id(status_icon), bad ? "\U000F0026" : "\U000F05E0");
+          lv_obj_set_style_text_color(id(status_icon), lv_color_hex(col), 0);
+          lv_obj_set_style_border_color(id(status_pill), lv_color_hex(col), 0);
+          lv_obj_set_style_bg_color(id(status_pill), lv_color_hex(bad ? 0x4A1C22 : 0x0E3B36), 0);
+
+  # Wskazniki (arc) temperatury i wilgotnosci na stronie terrarium
+  - id: update_terrarium
+    then:
+      - lambda: |-
+          float t = id(ha_temp_terrarium).state;
+          float h = id(ha_hum_terrarium).state;
+          if (!std::isnan(t)) {
+            lv_arc_set_value(id(terrarium_temp_arc), (int) (t * 10));
+            bool low = t < ${terrarium_temp_min};
+            bool high = t > ${terrarium_temp_max};
+            lv_color_t c = lv_color_hex((low || high) ? 0xEF5350 : 0x66BB6A);
+            lv_obj_set_style_arc_color(id(terrarium_temp_arc), c, LV_PART_INDICATOR);
+            lv_obj_set_style_text_color(id(terrarium_temp_label), c, 0);
+            lv_label_set_text(id(terrarium_temp_status), low ? "Za zimno" : (high ? "Za cieplo" : "W zakresie"));
+          }
+          if (!std::isnan(h)) {
+            lv_arc_set_value(id(terrarium_hum_arc), (int) h);
+          }
 
   - id: nav_select
     parameters:
       idx: int
     then:
       - lambda: |-
-          lv_obj_t *b[4] = {id(nav_btn0), id(nav_btn1), id(nav_btn2), id(nav_btn3)};
-          for (int i = 0; i < 4; i++) {
+          lv_obj_t *b[5] = {id(nav_btn0), id(nav_btn1), id(nav_btn2), id(nav_btn3), id(nav_btn4)};
+          for (int i = 0; i < 5; i++) {
             bool on = (i == idx);
             lv_obj_set_style_bg_color(b[i], lv_color_hex(on ? 0x1E2A4A : 0x1B2338), 0);
             lv_obj_set_style_border_width(b[i], on ? 1 : 0, 0);
@@ -703,8 +811,11 @@ script:
 
 # ============================================================
 # LVGL UI
-# Paleta: tlo 0x0F1424 | karta 0x1B2338 | akcenty per akwarium
+# Strony: Zegar (home) | Multimedia | Energia | Terrarium | Ustawienia
+# + Wygaszacz (dim_page) wlaczany po bezczynnosci
+# Paleta: tlo 0x0F1424 | karta 0x1B2338 | zegar: granat 0x070B24..0x16215A
 #   Salon 0x4FC3F7 (cyjan) | Sypialnia 0xB388FF (fiolet) | Kuchnia 0xFFB74D (bursztyn)
+#   Terrarium 0x66BB6A (zielony)
 # ============================================================
 lvgl:
   displays:
@@ -719,16 +830,29 @@ lvgl:
   bg_color: 0x0F1424
   default_font: font_nav
 
+  # Po bezczynnosci: wygaszacz (przyciemniony zegar), albo powrot na zegar gdy wylaczony w ustawieniach
   on_idle:
     timeout: 60s
     then:
-      - lvgl.page.show: {id: home_page, animation: FADE_IN, time: 300ms}
-      - script.execute: {id: nav_select, idx: 0}
+      - if:
+          condition:
+            lambda: 'return id(screensaver_on);'
+          then:
+            - lvgl.page.show: {id: dim_page, animation: FADE_IN, time: 500ms}
+            - lvgl.widget.hide: nav_bar
+            - light.turn_on:
+                id: display_backlight
+                brightness: 5%
+                transition_length: 0s
+          else:
+            - lvgl.page.show: {id: clock_page, animation: FADE_IN, time: 300ms}
+            - script.execute: {id: nav_select, idx: 0}
 
   # Dolny pasek nawigacji
   top_layer:
     widgets:
       - obj:
+          id: nav_bar
           align: BOTTOM_MID
           width: 480
           height: 58
@@ -740,8 +864,8 @@ lvgl:
             - button:
                 id: nav_btn0
                 align: LEFT_MID
-                x: 17
-                width: 106
+                x: 14
+                width: 86
                 height: 40
                 bg_color: 0x1E2A4A
                 radius: 20
@@ -755,14 +879,35 @@ lvgl:
                       text_color: 0xDCE3F7
                       text: "\U000F02DC"
                 on_click:
-                  - lvgl.page.show: {id: home_page, animation: FADE_IN, time: 250ms}
+                  - lvgl.page.show: {id: clock_page, animation: FADE_IN, time: 250ms}
                   - script.execute: {id: nav_select, idx: 0}
 
             - button:
                 id: nav_btn1
                 align: LEFT_MID
-                x: 130
-                width: 106
+                x: 106
+                width: 86
+                height: 40
+                bg_color: 0x1B2338
+                radius: 20
+                border_width: 0
+                border_color: 0x3B5BDB
+                shadow_width: 0
+                widgets:
+                  - label:
+                      align: CENTER
+                      text_font: mdi_small
+                      text_color: 0xDCE3F7
+                      text: "\U000F04C3"
+                on_click:
+                  - lvgl.page.show: {id: media_page, animation: FADE_IN, time: 250ms}
+                  - script.execute: {id: nav_select, idx: 1}
+
+            - button:
+                id: nav_btn2
+                align: LEFT_MID
+                x: 198
+                width: 86
                 height: 40
                 bg_color: 0x1B2338
                 radius: 20
@@ -777,13 +922,13 @@ lvgl:
                       text: "\U000F023A"
                 on_click:
                   - lvgl.page.show: {id: aquariums_page, animation: FADE_IN, time: 250ms}
-                  - script.execute: {id: nav_select, idx: 1}
+                  - script.execute: {id: nav_select, idx: 2}
 
             - button:
-                id: nav_btn2
+                id: nav_btn3
                 align: LEFT_MID
-                x: 243
-                width: 106
+                x: 290
+                width: 86
                 height: 40
                 bg_color: 0x1B2338
                 radius: 20
@@ -798,13 +943,13 @@ lvgl:
                       text: "\U000F050F"
                 on_click:
                   - lvgl.page.show: {id: terrarium_page, animation: FADE_IN, time: 250ms}
-                  - script.execute: {id: nav_select, idx: 2}
+                  - script.execute: {id: nav_select, idx: 3}
 
             - button:
-                id: nav_btn3
+                id: nav_btn4
                 align: LEFT_MID
-                x: 356
-                width: 106
+                x: 382
+                width: 86
                 height: 40
                 bg_color: 0x1B2338
                 radius: 20
@@ -819,55 +964,363 @@ lvgl:
                       text: "\U000F0493"
                 on_click:
                   - lvgl.page.show: {id: settings_page, animation: FADE_IN, time: 250ms}
-                  - script.execute: {id: nav_select, idx: 3}
+                  - script.execute: {id: nav_select, idx: 4}
 
   pages:
     # ============================================================
-    # STRONA 1: GLOWNA (zegar, pogoda, multimedia)
+    # STRONA 1: ZEGAR (styl nocnego zegara: pigulki, duzy zegar,
+    # banki z danymi, skroty do gniazdek)
     # ============================================================
-    - id: home_page
-      bg_color: 0x0F1424
+    - id: clock_page
+      bg_color: 0x070B24
+      bg_grad_color: 0x16215A
+      bg_grad_dir: VER
       widgets:
+        # --- gorne pigulki ---
+        - obj:
+            align: TOP_MID
+            x: -108
+            y: 10
+            width: 204
+            height: 34
+            radius: 17
+            bg_color: 0x1A2A63
+            border_width: 1
+            border_color: 0x3552B8
+            shadow_width: 0
+            pad_all: 0
+            widgets:
+              - label:
+                  id: pill_power_label
+                  align: CENTER
+                  text_font: font_small
+                  text_color: 0xDCE6FF
+                  text: "Razem -- W"
+        - obj:
+            align: TOP_MID
+            x: 108
+            y: 10
+            width: 204
+            height: 34
+            radius: 17
+            bg_color: 0x1A2A63
+            border_width: 1
+            border_color: 0x3552B8
+            shadow_width: 0
+            pad_all: 0
+            widgets:
+              - label:
+                  id: pill_sockets_label
+                  align: CENTER
+                  text_font: font_small
+                  text_color: 0xDCE6FF
+                  text: "Gniazdka --/4"
+
+        # --- data i zegar ---
+        - label:
+            id: date_label
+            align: TOP_MID
+            y: 54
+            text_font: font_power
+            text_color: 0xB9C6F5
+            text: "--"
         - label:
             id: clock_label
-            align: TOP_LEFT
-            x: 20
-            y: 4
-            text_font: font_clock
-            text_color: 0xE8EDFA
+            align: TOP_MID
+            y: 78
+            text_font: font_huge
+            text_color: 0xF2F6FF
             text: "--:--"
 
-        - label:
-            id: weather_icon
-            align: TOP_LEFT
-            x: 292
-            y: 22
-            text_font: mdi_weather
-            text_color: 0xF9C74F
-            text: "\U000F0590"
-        - label:
-            id: weather_temp
-            align: TOP_LEFT
-            x: 352
-            y: 18
-            text_font: font_power
-            text_color: 0xE8EDFA
-            text: "-- C"
-        - label:
-            id: weather_text
-            align: TOP_LEFT
-            x: 352
-            y: 54
-            width: 120
-            long_mode: DOT
-            text_font: font_nav
-            text_color: 0x7C88A8
-            text: "--"
+        # --- pigulka statusu ---
+        - obj:
+            id: status_pill
+            align: TOP_MID
+            y: 238
+            width: 340
+            height: 32
+            radius: 16
+            bg_color: 0x0E3B36
+            border_width: 1
+            border_color: 0x2ECC8F
+            shadow_width: 0
+            pad_all: 0
+            widgets:
+              - label:
+                  id: status_icon
+                  align: LEFT_MID
+                  x: 14
+                  text_font: mdi_small
+                  text_color: 0x2ECC8F
+                  text: "\U000F05E0"
+              - label:
+                  id: status_label
+                  align: CENTER
+                  x: 10
+                  text_font: font_small
+                  text_color: 0xDCE6FF
+                  text: "Wszystko w normie"
 
+        # --- banki z danymi: pogoda, wiatr, wilgotnosc, terrarium ---
+        - obj:
+            align: TOP_LEFT
+            x: 36
+            y: 282
+            width: 80
+            height: 80
+            radius: 40
+            bg_color: 0x1A2A63
+            border_width: 2
+            border_color: 0x3552B8
+            shadow_width: 0
+            pad_all: 0
+            widgets:
+              - label:
+                  id: weather_icon
+                  align: TOP_MID
+                  y: 10
+                  text_font: mdi_wx
+                  text_color: 0xF9C74F
+                  text: "\U000F0590"
+              - label:
+                  id: weather_temp
+                  align: BOTTOM_MID
+                  y: -10
+                  text_font: font_small
+                  text_color: 0xF2F6FF
+                  text: "-- C"
+        - obj:
+            align: TOP_LEFT
+            x: 144
+            y: 282
+            width: 80
+            height: 80
+            radius: 40
+            bg_color: 0x1A2A63
+            border_width: 2
+            border_color: 0x3552B8
+            shadow_width: 0
+            pad_all: 0
+            widgets:
+              - label:
+                  align: TOP_MID
+                  y: 10
+                  text_font: mdi_wx
+                  text_color: 0x9FB4F0
+                  text: "\U000F059D"
+              - label:
+                  id: wind_label
+                  align: BOTTOM_MID
+                  y: -10
+                  text_font: font_nav
+                  text_color: 0xF2F6FF
+                  text: "--"
+        - obj:
+            align: TOP_LEFT
+            x: 252
+            y: 282
+            width: 80
+            height: 80
+            radius: 40
+            bg_color: 0x1A2A63
+            border_width: 2
+            border_color: 0x3552B8
+            shadow_width: 0
+            pad_all: 0
+            widgets:
+              - label:
+                  align: TOP_MID
+                  y: 10
+                  text_font: mdi_wx
+                  text_color: 0x4FC3F7
+                  text: "\U000F058E"
+              - label:
+                  id: hum_out_label
+                  align: BOTTOM_MID
+                  y: -10
+                  text_font: font_small
+                  text_color: 0xF2F6FF
+                  text: "-- %"
+        - obj:
+            align: TOP_LEFT
+            x: 360
+            y: 282
+            width: 80
+            height: 80
+            radius: 40
+            bg_color: 0x1A2A63
+            border_width: 2
+            border_color: 0x66BB6A
+            shadow_width: 0
+            pad_all: 0
+            widgets:
+              - label:
+                  align: TOP_MID
+                  y: 10
+                  text_font: mdi_wx
+                  text_color: 0x66BB6A
+                  text: "\U000F050F"
+              - label:
+                  id: terr_bubble_label
+                  align: BOTTOM_MID
+                  y: -10
+                  text_font: font_small
+                  text_color: 0xF2F6FF
+                  text: "-- C"
+
+        # --- skroty: gniazdka ---
+        - button:
+            id: sc_salon
+            align: TOP_LEFT
+            x: 24
+            y: 372
+            width: 96
+            height: 46
+            radius: 23
+            bg_color: 0x1A2A63
+            border_width: 0
+            shadow_width: 0
+            widgets:
+              - label:
+                  id: sc_salon_icon
+                  align: CENTER
+                  text_font: mdi_big
+                  text_color: 0x8E9BC8
+                  text: "\U000F04B9"
+            on_click:
+              - homeassistant.service:
+                  service: switch.toggle
+                  data:
+                    entity_id: switch.gnizdo_rybki_salon
+        - button:
+            id: sc_sypialnia
+            align: TOP_LEFT
+            x: 136
+            y: 372
+            width: 96
+            height: 46
+            radius: 23
+            bg_color: 0x1A2A63
+            border_width: 0
+            shadow_width: 0
+            widgets:
+              - label:
+                  id: sc_sypialnia_icon
+                  align: CENTER
+                  text_font: mdi_big
+                  text_color: 0x8E9BC8
+                  text: "\U000F02E3"
+            on_click:
+              - homeassistant.service:
+                  service: switch.toggle
+                  data:
+                    entity_id: switch.gniazdo16w
+        - button:
+            id: sc_kuchnia
+            align: TOP_LEFT
+            x: 248
+            y: 372
+            width: 96
+            height: 46
+            radius: 23
+            bg_color: 0x1A2A63
+            border_width: 0
+            shadow_width: 0
+            widgets:
+              - label:
+                  id: sc_kuchnia_icon
+                  align: CENTER
+                  text_font: mdi_big
+                  text_color: 0x8E9BC8
+                  text: "\U000F0B7C"
+            on_click:
+              - homeassistant.service:
+                  service: switch.toggle
+                  data:
+                    entity_id: switch.gniazdo20w
+        - button:
+            id: sc_terrarium
+            align: TOP_LEFT
+            x: 360
+            y: 372
+            width: 96
+            height: 46
+            radius: 23
+            bg_color: 0x1A2A63
+            border_width: 0
+            shadow_width: 0
+            widgets:
+              - label:
+                  id: sc_terrarium_icon
+                  align: CENTER
+                  text_font: mdi_big
+                  text_color: 0x8E9BC8
+                  text: "\U000F050F"
+            on_click:
+              - homeassistant.service:
+                  service: switch.toggle
+                  data:
+                    entity_id: switch.gniazdo6_20w
+
+    # ============================================================
+    # WYGASZACZ: przyciemniony zegar, dotkniecie budzi ekran
+    # ============================================================
+    - id: dim_page
+      bg_color: 0x000000
+      widgets:
+        - obj:
+            id: dim_box
+            align: CENTER
+            width: 400
+            height: 170
+            bg_opa: TRANSP
+            border_width: 0
+            pad_all: 0
+            widgets:
+              - label:
+                  id: dim_clock_label
+                  align: TOP_MID
+                  y: 0
+                  text_font: font_dim
+                  text_color: 0x6B7599
+                  text: "--:--"
+              - label:
+                  id: dim_info_label
+                  align: BOTTOM_MID
+                  y: -4
+                  text_font: font_name
+                  text_color: 0x4A5578
+                  text: ""
+        - button:
+            id: dim_wake
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            width: 480
+            height: 480
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            radius: 0
+            on_click:
+              - lvgl.page.show: {id: clock_page, animation: FADE_IN, time: 250ms}
+              - lvgl.widget.show: nav_bar
+              - script.execute: {id: nav_select, idx: 0}
+              - light.turn_on:
+                  id: display_backlight
+                  brightness: !lambda 'return lv_slider_get_value(id(brightness_slider)) / 100.0f;'
+                  transition_length: 0s
+
+    # ============================================================
+    # STRONA 2: MULTIMEDIA (dwa odtwarzacze)
+    # ============================================================
+    - id: media_page
+      bg_color: 0x0F1424
+      widgets:
         - obj:
             id: salon_media_card
             align: TOP_MID
-            y: 98
+            y: 40
             width: 460
             height: 150
             bg_color: 0x1F2A44
@@ -1099,7 +1552,7 @@ lvgl:
         - obj:
             id: sypialnia_media_card
             align: TOP_MID
-            y: 256
+            y: 214
             width: 460
             height: 150
             bg_color: 0x1F2A44
@@ -1329,7 +1782,7 @@ lvgl:
                     radius: 3
 
     # ============================================================
-    # STRONA 1: 3 KARTY AKWARIOW (460x128)
+    # STRONA 3: ENERGIA (kafelki 2x2: Salon, Sypialnia, Kuchnia, Razem)
     # ============================================================
     - id: aquariums_page
       bg_color: 0x0F1424
@@ -1338,10 +1791,11 @@ lvgl:
         # --- SALON ---
         - obj:
             id: salon_card
-            align: TOP_MID
+            align: TOP_LEFT
+            x: 10
             y: 10
-            width: 460
-            height: 128
+            width: 226
+            height: 190
             bg_color: 0x1F2A44
             bg_grad_color: 0x151C30
             bg_grad_dir: VER
@@ -1351,73 +1805,25 @@ lvgl:
             shadow_width: 0
             pad_all: 0
             widgets:
-              - obj:
-                  id: salon_icon_bg
-                  align: TOP_LEFT
-                  x: 18
-                  y: 16
-                  width: 64
-                  height: 64
-                  radius: 32
-                  bg_color: 0x252F4D
-                  border_width: 0
-                  widgets:
-                    - label:
-                        align: CENTER
-                        text_font: mdi_big
-                        text_color: 0x4FC3F7
-                        text: "\U000F04B9"
-              - spinner:
-                  id: salon_ring
-                  hidden: true
-                  align: TOP_LEFT
-                  x: 14
-                  y: 12
-                  width: 72
-                  height: 72
-                  spin_time: 2200ms
-                  arc_length: 90deg
-                  arc_color: 0x4FC3F7
-                  arc_width: 4
-                  indicator:
-                    arc_color: 0x4FC3F7
-                    arc_width: 4
-                  bg_opa: TRANSP
               - label:
                   align: TOP_LEFT
-                  x: 98
+                  x: 16
                   y: 14
                   text_font: font_name
                   text_color: 0xE8EDFA
                   text: "Salon"
-              - label:
-                  id: salon_power_label
-                  align: TOP_LEFT
-                  x: 98
-                  y: 42
-                  text_font: font_big
-                  text_color: 0x4FC3F7
-                  text: "-- W"
-              - label:
-                  id: salon_energy_label
-                  align: BOTTOM_RIGHT
-                  x: -20
-                  y: -30
-                  text_font: font_small
-                  text_color: 0x7C88A8
-                  text: "-- kWh"
               - button:
                   id: salon_toggle
                   align: TOP_RIGHT
-                  x: -18
-                  y: 14
-                  width: 84
-                  height: 38
+                  x: -12
+                  y: 8
+                  width: 64
+                  height: 30
                   checkable: true
                   bg_color: 0x2C3858
                   checked:
                     bg_color: 0x2ECC8F
-                  radius: 19
+                  radius: 15
                   border_width: 0
                   shadow_width: 0
                   widgets:
@@ -1429,28 +1835,46 @@ lvgl:
                         text: "OFF"
                   on_value:
                     - script.execute: toggle_salon
-              - bar:
+              - arc:
                   id: salon_power_bar
-                  align: BOTTOM_MID
-                  y: -14
-                  width: 424
-                  height: 8
+                  align: TOP_MID
+                  y: 46
+                  width: 116
+                  height: 116
                   min_value: 0
-                  max_value: 100
+                  max_value: 200
                   value: 0
-                  radius: 4
-                  bg_color: 0x2C3858
+                  start_angle: 135
+                  end_angle: 45
+                  adjustable: false
+                  arc_width: 12
+                  arc_color: 0x2C3858
                   indicator:
-                    bg_color: 0x4FC3F7
-                    radius: 4
+                    arc_color: 0x4FC3F7
+                    arc_width: 12
+              - label:
+                  id: salon_power_label
+                  align: CENTER
+                  y: 9
+                  text_font: font_power
+                  text_color: 0x4FC3F7
+                  text: "-- W"
+              - label:
+                  id: salon_energy_label
+                  align: BOTTOM_MID
+                  y: -8
+                  text_font: font_small
+                  text_color: 0x7C88A8
+                  text: "-- kWh"
 
         # --- SYPIALNIA ---
         - obj:
             id: sypialnia_card
-            align: TOP_MID
-            y: 146
-            width: 460
-            height: 128
+            align: TOP_LEFT
+            x: 244
+            y: 10
+            width: 226
+            height: 190
             bg_color: 0x1F2A44
             bg_grad_color: 0x151C30
             bg_grad_dir: VER
@@ -1460,73 +1884,25 @@ lvgl:
             shadow_width: 0
             pad_all: 0
             widgets:
-              - obj:
-                  id: sypialnia_icon_bg
-                  align: TOP_LEFT
-                  x: 18
-                  y: 16
-                  width: 64
-                  height: 64
-                  radius: 32
-                  bg_color: 0x252F4D
-                  border_width: 0
-                  widgets:
-                    - label:
-                        align: CENTER
-                        text_font: mdi_big
-                        text_color: 0xB388FF
-                        text: "\U000F02E3"
-              - spinner:
-                  id: sypialnia_ring
-                  hidden: true
-                  align: TOP_LEFT
-                  x: 14
-                  y: 12
-                  width: 72
-                  height: 72
-                  spin_time: 2200ms
-                  arc_length: 90deg
-                  arc_color: 0xB388FF
-                  arc_width: 4
-                  indicator:
-                    arc_color: 0xB388FF
-                    arc_width: 4
-                  bg_opa: TRANSP
               - label:
                   align: TOP_LEFT
-                  x: 98
+                  x: 16
                   y: 14
                   text_font: font_name
                   text_color: 0xE8EDFA
                   text: "Sypialnia"
-              - label:
-                  id: sypialnia_power_label
-                  align: TOP_LEFT
-                  x: 98
-                  y: 42
-                  text_font: font_big
-                  text_color: 0xB388FF
-                  text: "-- W"
-              - label:
-                  id: sypialnia_energy_label
-                  align: BOTTOM_RIGHT
-                  x: -20
-                  y: -30
-                  text_font: font_small
-                  text_color: 0x7C88A8
-                  text: "-- kWh"
               - button:
                   id: sypialnia_toggle
                   align: TOP_RIGHT
-                  x: -18
-                  y: 14
-                  width: 84
-                  height: 38
+                  x: -12
+                  y: 8
+                  width: 64
+                  height: 30
                   checkable: true
                   bg_color: 0x2C3858
                   checked:
                     bg_color: 0x2ECC8F
-                  radius: 19
+                  radius: 15
                   border_width: 0
                   shadow_width: 0
                   widgets:
@@ -1538,28 +1914,46 @@ lvgl:
                         text: "OFF"
                   on_value:
                     - script.execute: toggle_sypialnia
-              - bar:
+              - arc:
                   id: sypialnia_power_bar
-                  align: BOTTOM_MID
-                  y: -14
-                  width: 424
-                  height: 8
+                  align: TOP_MID
+                  y: 46
+                  width: 116
+                  height: 116
                   min_value: 0
-                  max_value: 100
+                  max_value: 200
                   value: 0
-                  radius: 4
-                  bg_color: 0x2C3858
+                  start_angle: 135
+                  end_angle: 45
+                  adjustable: false
+                  arc_width: 12
+                  arc_color: 0x2C3858
                   indicator:
-                    bg_color: 0xB388FF
-                    radius: 4
+                    arc_color: 0xB388FF
+                    arc_width: 12
+              - label:
+                  id: sypialnia_power_label
+                  align: CENTER
+                  y: 9
+                  text_font: font_power
+                  text_color: 0xB388FF
+                  text: "-- W"
+              - label:
+                  id: sypialnia_energy_label
+                  align: BOTTOM_MID
+                  y: -8
+                  text_font: font_small
+                  text_color: 0x7C88A8
+                  text: "-- kWh"
 
         # --- KUCHNIA ---
         - obj:
             id: kuchnia_card
-            align: TOP_MID
-            y: 282
-            width: 460
-            height: 128
+            align: TOP_LEFT
+            x: 10
+            y: 208
+            width: 226
+            height: 190
             bg_color: 0x1F2A44
             bg_grad_color: 0x151C30
             bg_grad_dir: VER
@@ -1569,73 +1963,25 @@ lvgl:
             shadow_width: 0
             pad_all: 0
             widgets:
-              - obj:
-                  id: kuchnia_icon_bg
-                  align: TOP_LEFT
-                  x: 18
-                  y: 16
-                  width: 64
-                  height: 64
-                  radius: 32
-                  bg_color: 0x252F4D
-                  border_width: 0
-                  widgets:
-                    - label:
-                        align: CENTER
-                        text_font: mdi_big
-                        text_color: 0xFFB74D
-                        text: "\U000F0B7C"
-              - spinner:
-                  id: kuchnia_ring
-                  hidden: true
-                  align: TOP_LEFT
-                  x: 14
-                  y: 12
-                  width: 72
-                  height: 72
-                  spin_time: 2200ms
-                  arc_length: 90deg
-                  arc_color: 0xFFB74D
-                  arc_width: 4
-                  indicator:
-                    arc_color: 0xFFB74D
-                    arc_width: 4
-                  bg_opa: TRANSP
               - label:
                   align: TOP_LEFT
-                  x: 98
+                  x: 16
                   y: 14
                   text_font: font_name
                   text_color: 0xE8EDFA
                   text: "Kuchnia"
-              - label:
-                  id: kuchnia_power_label
-                  align: TOP_LEFT
-                  x: 98
-                  y: 42
-                  text_font: font_big
-                  text_color: 0xFFB74D
-                  text: "-- W"
-              - label:
-                  id: kuchnia_energy_label
-                  align: BOTTOM_RIGHT
-                  x: -20
-                  y: -30
-                  text_font: font_small
-                  text_color: 0x7C88A8
-                  text: "-- kWh"
               - button:
                   id: kuchnia_toggle
                   align: TOP_RIGHT
-                  x: -18
-                  y: 14
-                  width: 84
-                  height: 38
+                  x: -12
+                  y: 8
+                  width: 64
+                  height: 30
                   checkable: true
                   bg_color: 0x2C3858
                   checked:
                     bg_color: 0x2ECC8F
-                  radius: 19
+                  radius: 15
                   border_width: 0
                   shadow_width: 0
                   widgets:
@@ -1647,23 +1993,79 @@ lvgl:
                         text: "OFF"
                   on_value:
                     - script.execute: toggle_kuchnia
-              - bar:
+              - arc:
                   id: kuchnia_power_bar
-                  align: BOTTOM_MID
-                  y: -14
-                  width: 424
-                  height: 8
+                  align: TOP_MID
+                  y: 46
+                  width: 116
+                  height: 116
                   min_value: 0
-                  max_value: 100
+                  max_value: 200
                   value: 0
-                  radius: 4
-                  bg_color: 0x2C3858
+                  start_angle: 135
+                  end_angle: 45
+                  adjustable: false
+                  arc_width: 12
+                  arc_color: 0x2C3858
                   indicator:
-                    bg_color: 0xFFB74D
-                    radius: 4
+                    arc_color: 0xFFB74D
+                    arc_width: 12
+              - label:
+                  id: kuchnia_power_label
+                  align: CENTER
+                  y: 9
+                  text_font: font_power
+                  text_color: 0xFFB74D
+                  text: "-- W"
+              - label:
+                  id: kuchnia_energy_label
+                  align: BOTTOM_MID
+                  y: -8
+                  text_font: font_small
+                  text_color: 0x7C88A8
+                  text: "-- kWh"
+
+        # --- RAZEM ---
+        - obj:
+            align: TOP_LEFT
+            x: 244
+            y: 208
+            width: 226
+            height: 190
+            bg_color: 0x1F2A44
+            bg_grad_color: 0x151C30
+            bg_grad_dir: VER
+            radius: 24
+            border_width: 1
+            border_color: 0xF9C74F
+            shadow_width: 0
+            pad_all: 0
+            widgets:
+              - label:
+                  align: TOP_LEFT
+                  x: 16
+                  y: 14
+                  text_font: font_name
+                  text_color: 0xE8EDFA
+                  text: "Razem"
+              - label:
+                  id: total_power_label
+                  align: CENTER
+                  y: -4
+                  text_font: font_big
+                  text_color: 0xF9C74F
+                  text: "-- W"
+              - label:
+                  id: total_count_label
+                  align: BOTTOM_MID
+                  y: -30
+                  text_font: font_small
+                  text_color: 0x7C88A8
+                  text: "--/4 wlaczone"
+
 
     # ============================================================
-    # STRONA 3: TERRARIUM (gniazdo + temperatura + wilgotnosc)
+    # STRONA 4: TERRARIUM (gniazdo + wskazniki temperatury i wilgotnosci)
     # ============================================================
     - id: terrarium_page
       bg_color: 0x0F1424
@@ -1767,6 +2169,7 @@ lvgl:
                     bg_color: 0x66BB6A
                     radius: 4
 
+        # --- wskaznik temperatury ---
         - obj:
             align: TOP_MID
             x: -115
@@ -1784,24 +2187,43 @@ lvgl:
             widgets:
               - label:
                   align: TOP_MID
-                  y: 14
+                  y: 12
                   text_font: font_small
                   text_color: 0x7C88A8
                   text: "Temperatura"
-              - label:
-                  align: CENTER
-                  y: -30
-                  text_font: mdi_big
-                  text_color: 0xFF8A65
-                  text: "\U000F050F"
+              - arc:
+                  id: terrarium_temp_arc
+                  align: TOP_MID
+                  y: 40
+                  width: 140
+                  height: 140
+                  min_value: 150
+                  max_value: 400
+                  value: 150
+                  start_angle: 135
+                  end_angle: 45
+                  adjustable: false
+                  arc_width: 12
+                  arc_color: 0x2C3858
+                  indicator:
+                    arc_color: 0x66BB6A
+                    arc_width: 12
               - label:
                   id: terrarium_temp_label
+                  align: CENTER
+                  y: 0
+                  text_font: font_power
+                  text_color: 0x66BB6A
+                  text: "--"
+              - label:
+                  id: terrarium_temp_status
                   align: BOTTOM_MID
-                  y: -20
-                  text_font: font_big
-                  text_color: 0xFF8A65
+                  y: -12
+                  text_font: font_nav
+                  text_color: 0x7C88A8
                   text: "--"
 
+        # --- wskaznik wilgotnosci ---
         - obj:
             align: TOP_MID
             x: 115
@@ -1819,26 +2241,57 @@ lvgl:
             widgets:
               - label:
                   align: TOP_MID
-                  y: 14
+                  y: 12
                   text_font: font_small
                   text_color: 0x7C88A8
                   text: "Wilgotnosc"
-              - label:
-                  align: CENTER
-                  y: -30
-                  text_font: mdi_big
-                  text_color: 0x4FC3F7
-                  text: "\U000F058E"
+              - arc:
+                  id: terrarium_hum_arc
+                  align: TOP_MID
+                  y: 40
+                  width: 140
+                  height: 140
+                  min_value: 0
+                  max_value: 100
+                  value: 0
+                  start_angle: 135
+                  end_angle: 45
+                  adjustable: false
+                  arc_width: 12
+                  arc_color: 0x2C3858
+                  indicator:
+                    arc_color: 0x4FC3F7
+                    arc_width: 12
               - label:
                   id: terrarium_hum_label
-                  align: BOTTOM_MID
-                  y: -20
-                  text_font: font_big
+                  align: CENTER
+                  y: 0
+                  text_font: font_power
                   text_color: 0x4FC3F7
                   text: "--"
 
+        # --- zakres docelowy ---
+        - obj:
+            align: TOP_MID
+            y: 374
+            width: 360
+            height: 32
+            radius: 16
+            bg_color: 0x1A2A63
+            border_width: 1
+            border_color: 0x3552B8
+            shadow_width: 0
+            pad_all: 0
+            widgets:
+              - label:
+                  align: CENTER
+                  text_font: font_small
+                  text_color: 0xDCE6FF
+                  text: "Zakres docelowy: ${terrarium_temp_min} - ${terrarium_temp_max} C"
+
+
     # ============================================================
-    # STRONA 4: USTAWIENIA
+    # STRONA 5: USTAWIENIA
     # ============================================================
     - id: settings_page
       bg_color: 0x0F1424
@@ -1870,6 +2323,29 @@ lvgl:
                   brightness: !lambda 'return x / 100.0;'
 
         - label:
+            align: TOP_LEFT
+            x: 50
+            y: 170
+            text_font: font_name
+            text_color: 0xE8EDFA
+            text: "Wygaszacz (zegar nocny)"
+
+        - switch:
+            id: screensaver_switch
+            align: TOP_RIGHT
+            x: -50
+            y: 166
+            width: 64
+            height: 32
+            state:
+              checked: true
+            bg_color: 0x2C3858
+            indicator:
+              bg_color: 0x2C3858
+            on_value:
+              - lambda: 'id(screensaver_on) = x;'
+
+        - label:
             id: ip_label
             align: CENTER
             y: 60
@@ -1882,4 +2358,4 @@ lvgl:
             y: 90
             text_font: font_nav
             text_color: 0x56608A
-            text: "HA Panel Rybki v3.0"
+            text: "HA Panel Rybki v4.0"

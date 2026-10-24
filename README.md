@@ -176,16 +176,20 @@ Dodatkowo encja `Backlight` (światło) pozwala sterować podświetleniem z HA.
 
 ## Interfejs na ekranie
 
-Ekran 480×480, ciemny motyw (tło `0x0F1424`, karty `0x1B2338`), grafika LVGL.
-Na dole stały pasek nawigacji z czterema przyciskami (ikony MDI). Po 60 s bezczynności
-panel wraca na stronę główną.
+Ekran 480×480, ciemny motyw, grafika LVGL. Na dole stały pasek nawigacji z pięcioma przyciskami
+(ikony MDI). Po 60 s bezczynności panel przechodzi w wygaszacz (można wyłączyć w Ustawieniach).
 
 | Strona | Zawartość |
 |--------|-----------|
-| **Główna** | Duży zegar, ikona i temperatura pogody, dwie karty odtwarzaczy (Salon, Sypialnia): tytuł, sterowanie, głośność, animowany equalizer |
-| **Akwaria** | Trzy karty (Salon, Sypialnia, Kuchnia): przełącznik ON/OFF, moc w W z paskiem, energia w kWh |
-| **Terrarium** | Przełącznik gniazdka, moc, temperatura i wilgotność |
-| **Ustawienia** | Suwak jasności ekranu 5–100% (steruje encją `Backlight`), adres IP urządzenia i wersja panelu |
+| **Zegar** (główna) | Gradientowe tło, kapsułki „Razem W” i „Gniazdka x/4”, data po polsku, zegar 140 px, kapsułka statusu (czerwona gdy temperatura terrarium poza zakresem), cztery bąbelki (pogoda, wiatr, wilgotność zewn., terrarium) i skróty do czterech gniazdek |
+| **Multimedia** | Dwie karty odtwarzaczy (Salon, Sypialnia): tytuł, sterowanie, głośność, animowany equalizer |
+| **Energia** | Kafelki 2×2: Salon, Sypialnia, Kuchnia (łuk mocy 0–200 W, przełącznik, kWh) oraz „Razem” |
+| **Terrarium** | Przełącznik gniazdka, moc, wskaźniki łukowe temperatury i wilgotności, zakres docelowy (`terrarium_temp_min/max` w `substitutions`) |
+| **Ustawienia** | Suwak jasności 5–100%, przełącznik wygaszacza, adres IP i wersja panelu |
+| **Wygaszacz** | Przyciemniony zegar (5% jasności) przesuwany co minutę, dotknięcie budzi ekran |
+
+Poprzednia wersja ekranów (v1: zegar + multimedia, Akwaria, Terrarium, Ustawienia) jest pod tagiem `screens-v1`:
+`git checkout screens-v1 -- ha-panel.yaml`.
 
 Sposób prezentacji:
 
