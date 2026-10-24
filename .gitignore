@@ -1,0 +1,17 @@
+# ESPHome
+/.esphome/
+/secrets.yaml
+
+# Sekrety i lokalna konfiguracja
+.env
+.claude/
+
+# Python
+.venv/
+__pycache__/
+
+# Edytory / system
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
