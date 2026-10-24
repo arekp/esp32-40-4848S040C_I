@@ -1,0 +1,7 @@
+# Narzędzia deweloperskie (Python 3.13). Instalacja: pip install -r requirements.txt
+esphome==2026.10.0        # kompilacja, flashowanie, OTA, logi (CLI: esphome)
+esptool==5.4.0            # niskopoziomowy flash/odczyt układu przez USB
+platformio==6.2.0         # toolchain używany przez ESPHome
+aioesphomeapi==46.12.0    # klient API ESPHome (aioesphomeapi-logs / -discover)
+mcp==1.30.0               # wymagane przez openocd-mcp
+openocd-mcp==0.4.5        # opcjonalnie: debug JTAG z poziomu Claude Code (wymaga OpenOCD)
