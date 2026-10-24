@@ -48,3 +48,7 @@ Panel dotykowy Home Assistant na płytce **Guition ESP32-S3-4848S040C_I**
 - [ESPHome device page](https://devices.esphome.io/devices/guition-esp32-s3-4848s040)
 - [NorthernMan54/ESP32-4848S040](https://github.com/NorthernMan54/ESP32-4848S040)
 - [atomic14 – gotchas](https://www.atomic14.com/esp32/boards/guition-4848s040/)
+
+## Licencja
+
+MIT — zobacz [LICENSE](LICENSE).
