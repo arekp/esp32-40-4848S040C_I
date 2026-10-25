@@ -232,6 +232,22 @@ Nie są wersjonowane: `secrets.yaml`, `.env`, `.claude/`, `.venv/`, `.esphome/`.
 - GPIO 33–37 zajęte przez Octal PSRAM; SD i LCD współdzielą GPIO 47/48.
 - GPIO 0 i 3 to piny strappingowe użyte w magistrali RGB.
 
+### Tył płytki i złącza
+
+![Tył płytki — złącza BAT, MX1.25 4P i Speak](docs/board-back.png)
+
+Źródło zdjęcia: [displaysmodule.com](https://www.displaysmodule.com/photo/py200569774-experience_superior_display_performance_with_esp32_display_module_480_480_resolution_and_86_5_86_5_37_8_mm_size.jpg).
+
+| Złącze | Opis na zdjęciu |
+|--------|-----------------|
+| `BAT` | MX1.25 2P — zasilanie bateryjne |
+| bez nazwy | MX1.25 4P — złącze rozszerzeń (do potwierdzenia: piny i napięcie) |
+| `Speak` | MX1.25 2P — wyjście na głośnik, więc płytka ma wzmacniacz audio |
+| nagłówek 2×4 | wyprowadzenia środka płytki (do potwierdzenia) |
+
+Zdjęcie nie opisuje pinów. Przed podłączeniem mikrofonu sprawdź piny multimetrem
+albo na schemacie producenta.
+
 Zasoby:
 [ESPHome device page](https://devices.esphome.io/devices/guition-esp32-s3-4848s040) ·
 [NorthernMan54/ESP32-4848S040](https://github.com/NorthernMan54/ESP32-4848S040) ·
